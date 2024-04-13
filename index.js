@@ -3,7 +3,7 @@ const express = require("express");
 const { createServer } = require("http");
 const { Server } = require("ws");
 const { connection, conectarBanco } = require('./db');
-
+const PORT = process.env.PORT || 3000;
 // Conecta ao banco de dados
 conectarBanco();
 
@@ -307,6 +307,6 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-httpServer.listen(3000, () => {
+httpServer.listen(`${PORT}`, () => {
   console.log("Servidor está rodando na porta 3000");
 });
