@@ -2,10 +2,11 @@ const mysql = require('mysql');
 
 // Configurações de conexão com o banco de dados
 const connection = mysql.createConnection({
-    host: '127.0.0.1',
-    user: 'root',
-    password: '',
-    database: 'mini_rede_social'
+    host: 'adaptable-prod.database.windows.net',
+    user: 'friendzone-main-db-0fc740680a2dc15a3',
+    password: 'FtyxnXnB3GMYzSCpVnesj9bzVhCPkJ',
+    database: 'friendzone-main-db-0fc740680a2dc15a3',
+    port: 1433
 });
 
 // Função para conectar ao banco de dados
