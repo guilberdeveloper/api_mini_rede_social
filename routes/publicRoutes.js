@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const router = express.Router();
 const path = require('path');
-const { connection, conectarBanco } = require('../db');
+const { sql } = require('../db');
 require('dotenv').config();
 
 const tokenSecret = process.env.TOKEN_SECRET;
@@ -55,14 +55,11 @@ router.post("/cadastro", upload.single('fotoUsuario'), async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
         // Insere o novo usuário no banco de dados
-        connection.query('INSERT INTO usuario (name, email, password, fotoUsuario) VALUES (?, ?, ?, ?)', [name, email, hashedPassword, fotoUsuario], (err, results) => {
-            if (err) {
-                console.error('Erro ao cadastrar usuário:', err);
-                return res.status(500).json({ error: 'Erro ao cadastrar usuário' });
-            }
-
-            res.status(201).json({ message: 'Usuário cadastrado com sucesso' });
-        });
+        await sql`
+            INSERT INTO usuario (name, email, password, fotoUsuario)
+            VALUES (${name}, ${email}, ${hashedPassword}, ${fotoUsuario})
+        `;
+        res.status(201).json({ message: 'Usuário cadastrado com sucesso' });
     } catch (error) {
         console.error('Erro ao gerar hash da senha:', error);
         return res.status(500).json({ error: 'Erro ao cadastrar usuário' });
@@ -70,8 +67,7 @@ router.post("/cadastro", upload.single('fotoUsuario'), async (req, res) => {
 });
 
 
-/*
-router.post("/login", (req, res) => {
+router.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
     // Verifica se o email e a senha foram fornecidos
@@ -79,74 +75,25 @@ router.post("/login", (req, res) => {
         return res.status(400).json({ error: 'Email e senha são obrigatórios' });
     }
 
-    // Consulta o banco de dados para encontrar o usuário com o email fornecido
-    connection.query('SELECT id, name, email, password FROM usuario WHERE email = ?', [email], (err, results) => {
-        if (err) {
-            console.error('Erro ao consultar o banco de dados:', err);
-            return res.status(500).json({ error: 'Erro ao realizar login' });
-        }
-
+    try {
+        // Consulta o banco de dados para encontrar o usuário com o email fornecido
+        const users = await sql`
+            SELECT id, name, email, fotoUsuario, password
+            FROM usuario
+            WHERE email = ${email}
+        `;
+        
         // Verifica se o usuário foi encontrado
-        if (results.length === 0) {
+        if (users.length === 0) {
             return res.status(401).json({ error: 'Credenciais inválidas' });
         }
 
-        const user = results[0];
-
-        // Verifica se a senha está correta
-        if (user.password !== password) {
-            return res.status(401).json({ error: 'Credenciais inválidas' });
-        }
-
-        // Cria um token JWT
-        const token = jwt.sign({ userId: user.id, email: user.email }, tokenSecret, { expiresIn: '1h' });
-
-        // Adiciona o usuario ao objeto de usuarios logados e armazena sua conexão
-        usuariosLogados[user.id] = {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            token: token,
-            socket: req.socket // Armazena a conexão do socket
-        };
-
-        // Retorna o ID, nome e token
-        res.json({ id: user.id, name: user.name, token });
-    });
-});
-*/
-
-router.post("/login", (req, res) => {
-    const { email, password } = req.body;
-
-    // Verifica se o email e a senha foram fornecidos
-    if (!email || !password) {
-        return res.status(400).json({ error: 'Email e senha são obrigatórios' });
-    }
-
-    // Consulta o banco de dados para encontrar o usuário com o email fornecido
-    connection.query('SELECT id, name, email, fotoUsuario, password FROM usuario WHERE email = ?', [email], async (err, results) => {
-        if (err) {
-            console.error('Erro ao consultar o banco de dados:', err);
-            return res.status(500).json({ error: 'Erro ao realizar login' });
-        }
-
-        // Verifica se o usuário foi encontrado
-        if (results.length === 0) {
-            return res.status(401).json({ error: 'Credenciais inválidas' });
-        }
-
-        const user = results[0];
+        const user = users[0];
 
         // Compara a senha fornecida com a senha armazenada no banco de dados
-        try {
-            const match = await bcrypt.compare(password, user.password);
-            if (!match) {
-                return res.status(401).json({ error: 'Credenciais inválidas' });
-            }
-        } catch (error) {
-            console.error('Erro ao comparar senhas:', error);
-            return res.status(500).json({ error: 'Erro ao realizar login' });
+        const match = await bcrypt.compare(password, user.password);
+        if (!match) {
+            return res.status(401).json({ error: 'Credenciais inválidas' });
         }
 
         // Cria um token JWT
@@ -164,29 +111,26 @@ router.post("/login", (req, res) => {
 
         // Retorna o ID, nome, foto e token
         res.json({ id: user.id, name: user.name, fotoUsuario: user.fotoUsuario, token });
-    });
+    } catch (error) {
+        console.error('Erro ao realizar login:', error);
+        return res.status(500).json({ error: 'Erro ao realizar login' });
+    }
 });
 
 
 // Função para pesquisar pessoas pelo nome ou pela primeira letra do nome
-function buscarPessoasPorNome(name) {
-    return new Promise((resolve, reject) => {
+async function buscarPessoasPorNome(name) {
+    try {
         // Consulta SQL para pesquisar pessoas pelo nome
-        const query = `
-      SELECT *
-      FROM usuario
-      WHERE name LIKE ?
-    `;
-        // Parâmetro para adicionar '%' ao início e ao final do nome para pesquisa de correspondência parcial
-        const searchTerm = `%${name}%`;
-        connection.query(query, [searchTerm], (err, results) => {
-            if (err) {
-                reject(err);
-                return;
-            }
-            resolve(results);
-        });
-    });
+        const pessoas = await sql`
+            SELECT *
+            FROM usuario
+            WHERE name ILIKE '%' || ${name} || '%'
+        `;
+        return pessoas;
+    } catch (error) {
+        throw error;
+    }
 }
 
 // Rota para pesquisar pessoas pelo nome ou pela primeira letra do nome
@@ -207,59 +151,31 @@ router.get('/pessoas', async (req, res) => {
 });
 
 
-/*
-router.post("/addAmigo", async (req, res) => {
-    const { userId, friendId } = req.body;
-
-    try {
-        connection.query('INSERT INTO amigos (usuario_id, amigo_id) VALUES (?, ?)', [userId, friendId], (err, results) => {
-            if (err) {
-                throw err;
-            }
-            res.status(200).json({ message: 'Amigo adicionado com sucesso' });
-        });
-    } catch (error) {
-        console.error('Erro ao adicionar amigo:', error);
-        res.status(500).json({ error: 'Erro ao adicionar amigo' });
-    }
-});
-*/
-
 router.post("/addAmigo", async (req, res) => {
     const { userId, friendId } = req.body;
 
     try {
         // Adiciona amigo na tabela amigos
-        connection.query('INSERT INTO amigos (usuario_id, amigo_id) VALUES (?, ?)', [userId, friendId], async (err, results) => {
-            if (err) {
-                throw err;
-            }
+        await sql`
+            INSERT INTO amigos (usuario_id, amigo_id) VALUES (${userId}, ${friendId})
+        `;
 
-            // Obtém o ID do amigo recém-adicionado
-            const amigoId = results.insertId;
+        // Obtém o ID do amigo recém-adicionado
+        const amigoId = friendId;
 
-            // Cria tabela de chat
-            const createChatTableQuery = `
-                CREATE TABLE IF NOT EXISTS chat_${amigoId} (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    usuario_id INT,
-                    amigo_id INT,
-                    mensagem TEXT,
-                    data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            `;
-            await new Promise((resolve, reject) => {
-                connection.query(createChatTableQuery, (err, results) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve();
-                    }
-                });
-            });
+        // Cria tabela de chat
+        const createChatTableQuery = `
+            CREATE TABLE IF NOT EXISTS chat_${amigoId} (
+                id SERIAL PRIMARY KEY,
+                usuario_id INT,
+                amigo_id INT,
+                mensagem TEXT,
+                data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+        await sql(createChatTableQuery);
 
-            res.status(200).json({ message: 'Amigo adicionado com sucesso' });
-        });
+        res.status(200).json({ message: 'Amigo adicionado com sucesso' });
     } catch (error) {
         console.error('Erro ao adicionar amigo:', error);
         res.status(500).json({ error: 'Erro ao adicionar amigo' });
@@ -271,12 +187,13 @@ router.get("/amigos/:userId", async (req, res) => {
     const userId = req.params.userId;
 
     try {
-        connection.query('SELECT amigos.amigo_id, usuario.name FROM amigos INNER JOIN usuario ON amigos.amigo_id = usuario.id WHERE amigos.usuario_id = ?', [userId], (err, results) => {
-            if (err) {
-                throw err;
-            }
-            res.json(results);
-        });
+        const amigos = await sql`
+            SELECT amigos.amigo_id, usuario.name
+            FROM amigos
+            INNER JOIN usuario ON amigos.amigo_id = usuario.id
+            WHERE amigos.usuario_id = ${userId}
+        `;
+        res.json(amigos);
     } catch (error) {
         console.error('Erro ao buscar amigos:', error);
         res.status(500).json({ error: 'Erro ao buscar amigos' });
@@ -286,15 +203,14 @@ router.get("/amigos/:userId", async (req, res) => {
 
 
 // mostrar foto do usuario
-router.get("/foto/:userId", (req, res) => {
+router.get("/foto/:userId", async (req, res) => {
     const userId = req.params.userId;
 
-    // Consulta o banco de dados para obter o blob contendo o caminho do arquivo da foto do usuário
-    connection.query('SELECT fotoUsuario FROM usuario WHERE id = ?', [userId], (err, results) => {
-        if (err) {
-            console.error('Erro ao consultar o banco de dados:', err);
-            return res.status(500).json({ error: 'Erro ao obter a foto do usuário' });
-        }
+    try {
+        // Consulta o banco de dados para obter o blob contendo o caminho do arquivo da foto do usuário
+        const results = await sql`
+            SELECT fotoUsuario FROM usuario WHERE id = ${userId}
+        `;
 
         // Verifica se o usuário foi encontrado
         if (results.length === 0) {
@@ -310,20 +226,17 @@ router.get("/foto/:userId", (req, res) => {
         const caminhoRelativo = `../${caminhoArquivo}`;
         const caminhoAbsoluto = path.join(__dirname, caminhoRelativo);
 
-        console.log(caminhoAbsoluto)
         // Envie o arquivo de foto do usuário como resposta
         res.sendFile(caminhoAbsoluto);
-    });
+    } catch (error) {
+        console.error('Erro ao consultar o banco de dados:', error);
+        return res.status(500).json({ error: 'Erro ao obter a foto do usuário' });
+    }
 });
 
 
-
-
-// fazer publicaceos
-
 // Rota para os usuários fazerem publicações
-// Rota para os usuários fazerem publicações
-router.post("/publicacoes", (req, res) => {
+router.post("/publicacoes", async (req, res) => {
     const { userId, texto } = req.body;
 
     // Verifica se o usuário forneceu um texto para a publicação
@@ -331,55 +244,50 @@ router.post("/publicacoes", (req, res) => {
         return res.status(400).json({ error: 'O texto da publicação é obrigatório' });
     }
 
-    // Consulta o nome do usuário com base no ID fornecido
-    connection.query('SELECT name FROM usuario WHERE id = ?', [userId], (err, results) => {
-        if (err) {
-            console.error('Erro ao buscar nome do usuário:', err);
-            return res.status(500).json({ error: 'Erro ao buscar nome do usuário' });
-        }
+    try {
+        // Consulta o nome do usuário com base no ID fornecido
+        const user = await sql`
+            SELECT name FROM usuario WHERE id = ${userId}
+        `;
 
         // Verifica se o usuário foi encontrado
-        if (results.length === 0) {
+        if (user.length === 0) {
             return res.status(404).json({ error: 'Usuário não encontrado' });
         }
 
-        const userName = results[0].name;
+        const userName = user[0].name;
 
         // Insira a publicação no banco de dados com o nome do usuário
-        connection.query('INSERT INTO publicacoes (usuario_id, nome_usuario, texto) VALUES (?, ?, ?)', [userId, userName, texto], (err, results) => {
-            if (err) {
-                console.error('Erro ao cadastrar publicação:', err);
-                return res.status(500).json({ error: 'Erro ao cadastrar publicação' });
-            }
-
-            res.status(201).json({ message: 'Publicação cadastrada com sucesso' });
-        });
-    });
+        await sql`
+            INSERT INTO publicacoes (usuario_id, nome_usuario, texto)
+            VALUES (${userId}, ${userName}, ${texto})
+        `;
+        res.status(201).json({ message: 'Publicação cadastrada com sucesso' });
+    } catch (error) {
+        console.error('Erro ao cadastrar publicação:', error);
+        return res.status(500).json({ error: 'Erro ao cadastrar publicação' });
+    }
 });
 
 // Rota para buscar todas as publicações com o ID do usuário e o nome do usuário
-router.get("/publicacoes", (req, res) => {
-    // Consulta todas as publicações, o ID do usuário correspondente e o nome do usuário no banco de dados
-    const query = `
-        SELECT publicacoes.*, usuario.id AS userId, usuario.name AS userName
-        FROM publicacoes
-        INNER JOIN usuario ON publicacoes.usuario_id = usuario.id
-    `;
-    connection.query(query, (err, results) => {
-        if (err) {
-            console.error('Erro ao buscar publicações:', err);
-            return res.status(500).json({ error: 'Erro ao buscar publicações' });
-        }
-
-        res.status(200).json(results);
-    });
+router.get("/publicacoes", async (req, res) => {
+    try {
+        // Consulta todas as publicações, o ID do usuário correspondente e o nome do usuário no banco de dados
+        const publicacoes = await sql`
+            SELECT publicacoes.*, usuario.id AS userId, usuario.name AS userName
+            FROM publicacoes
+            INNER JOIN usuario ON publicacoes.usuario_id = usuario.id
+        `;
+        res.status(200).json(publicacoes);
+    } catch (error) {
+        console.error('Erro ao buscar publicações:', error);
+        return res.status(500).json({ error: 'Erro ao buscar publicações' });
+    }
 });
 
 
-
-
 // Rota para adicionar um like a uma publicação
-router.post("/likes", (req, res) => {
+router.post("/likes", async (req, res) => {
     const { usuarioCurtiuId, usuarioPublicouId, publicacaoId } = req.body;
 
     // Verifica se todos os campos obrigatórios foram fornecidos
@@ -387,22 +295,22 @@ router.post("/likes", (req, res) => {
         return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
     }
 
-    // Insira o like no banco de dados
-    connection.query('INSERT INTO likes (usuario_curtiu_id, usuario_publicou_id, publicacao_id) VALUES (?, ?, ?)', [usuarioCurtiuId, usuarioPublicouId, publicacaoId], (err, results) => {
-        if (err) {
-            console.error('Erro ao adicionar like:', err);
-            return res.status(500).json({ error: 'Erro ao adicionar like' });
-        }
-
+    try {
+        // Insira o like no banco de dados
+        await sql`
+            INSERT INTO likes (usuario_curtiu_id, usuario_publicou_id, publicacao_id)
+            VALUES (${usuarioCurtiuId}, ${usuarioPublicouId}, ${publicacaoId})
+        `;
         res.status(201).json({ message: 'Like adicionado com sucesso' });
-    });
+    } catch (error) {
+        console.error('Erro ao adicionar like:', error);
+        return res.status(500).json({ error: 'Erro ao adicionar like' });
+    }
 });
 
 
-
-
 // Rota para remover um like de uma publicação
-router.delete("/likes/:likeId", (req, res) => {
+router.delete("/likes/:likeId", async (req, res) => {
     const likeId = req.params.likeId;
 
     // Verifica se o ID do like foi fornecido
@@ -410,17 +318,17 @@ router.delete("/likes/:likeId", (req, res) => {
         return res.status(400).json({ error: 'O ID do like é obrigatório' });
     }
 
-    // Remove o like do banco de dados
-    connection.query('DELETE FROM likes WHERE id = ?', [likeId], (err, results) => {
-        if (err) {
-            console.error('Erro ao remover like:', err);
-            return res.status(500).json({ error: 'Erro ao remover like' });
-        }
-
+    try {
+        // Remove o like do banco de dados
+        await sql`
+            DELETE FROM likes WHERE id = ${likeId}
+        `;
         res.status(200).json({ message: 'Like removido com sucesso' });
-    });
+    } catch (error) {
+        console.error('Erro ao remover like:', error);
+        return res.status(500).json({ error: 'Erro ao remover like' });
+    }
 });
-
 
 
 // Rota para verificar se um usuário já é amigo de outro
@@ -429,27 +337,17 @@ router.get('/checkAmigo', async (req, res) => {
 
     try {
         // Consulta o banco de dados para verificar se existe uma entrada na tabela amigos
-        const query = 'SELECT COUNT(*) AS count FROM amigos WHERE usuario_id = ? AND amigo_id = ?';
-        const [result] = await new Promise((resolve, reject) => {
-            connection.query(query, [userId, friendId], (err, results) => {
-                if (err) {
-                    reject(err);
-                    return;
-                }
-                resolve(results);
-            });
-        });
+        const [result] = await sql`
+            SELECT COUNT(*) AS count FROM amigos WHERE usuario_id = ${userId} AND amigo_id = ${friendId}
+        `;
 
         // Verifica se o usuário já é amigo do outro
         const isFriend = result.count > 0;
         res.json({ isFriend });
     } catch (error) {
         console.error('Erro ao verificar se é amigo:', error);
-        res.status(500).json({ error: 'Erro ao verificar se é amigo' });
+        return res.status(500).json({ error: 'Erro ao verificar se é amigo' });
     }
 });
-
-
-
 
 module.exports = router;
