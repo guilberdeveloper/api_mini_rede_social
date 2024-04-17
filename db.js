@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 // Configurações de conexão com o banco de dados
-mongoose.connect('mongodb://127.0.0.1:27017/mini_rede_social', { useNewUrlParser: true, useUnifiedTopology: true });
+mongoose.connect( process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 
 // Obter a conexão padrão do Mongoose
 const connection = mongoose.connection;
