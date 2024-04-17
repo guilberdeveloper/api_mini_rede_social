@@ -2,9 +2,9 @@ const express = require("express");
 const { createServer } = require("http");
 const { Server } = require("ws");
 const mongoose = require('mongoose');
-const usuario = require('./models/usuario');
-const amigo = require('./models/amigo');
-const publicacao = require('./models/publicacao');
+const usuario = require('./models/Usuario');
+const amigo = require('./models/Amigo');
+const publicacao = require('./models/Publicacao');
 const PORT = process.env.PORT || 3000;
 
 
@@ -120,13 +120,15 @@ app.post("/send-message", async (req, res) => {
 // Rota para servir fotos estáticas
 app.use('/user-photos', express.static('./uploads'));
 
+app.get("/", (req, res) => {
+  res.send("Hello World!");
+});
+
+
 // rotas Publicas
 const publicRoutes = require("./routes/publicRoutes");
 app.use("/api", publicRoutes);
 
-app.get("/", (req, res) => {
-  res.send("Hello World!");
-});
 
 httpServer.listen(`${PORT}`, () => {
   console.log(`Servidor está rodando na porta ${PORT}`);
