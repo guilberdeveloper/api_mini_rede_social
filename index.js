@@ -1,5 +1,5 @@
 const express = require("express");
-const { createServer } = require("http");
+const { createServer } = require("https");
 const { Server } = require("ws");
 const mongoose = require('mongoose');
 const usuario = require('./models/Usuario');
