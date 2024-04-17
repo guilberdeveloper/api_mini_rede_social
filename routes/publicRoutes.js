@@ -10,9 +10,9 @@ require('dotenv').config();
 
 const dbConnection = require('../db');
 // Modelos mongo
-const Usuario = require("../models/Usuario");
-const Amigo = require("../models/Amigo");
-const Publicacao = require("../models/Publicacao");
+const usuario = require("../models/usuario");
+const amigo = require("../models/amigo");
+const publicacao = require("../models/publicacao");
 
 const tokenSecret = process.env.TOKEN_SECRET;
 
@@ -52,7 +52,7 @@ router.post("/cadastro", upload.single('fotoUsuario'), async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
         // Utilizando Mongoose para inserir o novo usuário no banco de dados
-        await Usuario.create({ name, email, password: hashedPassword, fotoUsuario });
+        await usuario.create({ name, email, password: hashedPassword, fotoUsuario });
 
         res.status(201).json({ message: 'Usuário cadastrado com sucesso' });
     } catch (error) {
@@ -70,7 +70,7 @@ router.post("/login", async (req, res) => {
     }
 
     try {
-        const user = await Usuario.findOne({ email });
+        const user = await usuario.findOne({ email });
         if (!user) {
             return res.status(401).json({ error: 'Credenciais inválidas' });
         }
@@ -100,7 +100,7 @@ router.post("/login", async (req, res) => {
 
 
 function buscarPessoasPorNome(name) {
-    return Usuario.find({ name: { $regex: name, $options: 'i' } }, '_id name fotoUsuario');
+    return usuario.find({ name: { $regex: name, $options: 'i' } }, '_id name fotoUsuario');
 }
 
 router.get('/pessoas', async (req, res) => {
@@ -126,7 +126,7 @@ router.post("/addAmigo", async (req, res) => {
     
 
     try {
-        await Amigo.create({ usuario_id, amigo_id });
+        await amigo.create({ usuario_id, amigo_id });
 
         // Lógica para criar a tabela de chat com Mongoose
 
@@ -142,7 +142,7 @@ router.post("/addAmigo", async (req, res) => {
 router.get("/amigos/:userId", async (req, res) => {
     const userId = req.params.userId.toString(); // Converter para string
     try {
-        const amigos = await Amigo.find({ usuario_id: userId }).populate('amigo_id', 'name');
+        const amigos = await amigo.find({ usuario_id: userId }).populate('amigo_id', 'name');
         res.json(amigos);
     } catch (error) {
         console.error('Erro ao buscar amigos:', error);
@@ -159,7 +159,7 @@ router.get("/foto/:userId", async (req, res) => {
             return res.status(400).json({ error: 'O ID do usuário é obrigatório' });
         }
 
-        const user = await Usuario.findById(userId);
+        const user = await usuario.findById(userId);
         if (!user) {
             return res.status(404).json({ error: 'Usuário não encontrado' });
         }
@@ -183,12 +183,12 @@ router.post("/publicacoes", async (req, res) => {
     }
 
     try {
-        const user = await Usuario.findById(userId);
+        const user = await usuario.findById(userId);
         if (!user) {
             return res.status(404).json({ error: 'Usuário não encontrado' });
         }
 
-        await Publicacao.create({ usuario_id: userId, nome_usuario: user.name, texto });
+        await publicacao.create({ usuario_id: userId, nome_usuario: user.name, texto });
 
         res.status(201).json({ message: 'Publicação cadastrada com sucesso' });
     } catch (error) {
@@ -199,7 +199,7 @@ router.post("/publicacoes", async (req, res) => {
 
 router.get("/publicacoes", async (req, res) => {
     try {
-        const publicacoes = await Publicacao.find().populate('usuario_id', 'name');
+        const publicacoes = await publicacao.find().populate('usuario_id', 'name');
         res.status(200).json(publicacoes);
     } catch (error) {
         console.error('Erro ao buscar publicações:', error);
@@ -211,7 +211,7 @@ router.get("/publicacoes", async (req, res) => {
 router.post('/publicacoes/:id/like', async (req, res) => {
     const publicacaoId = req.params.id;
     try {
-        const publicacao = await Publicacao.findById(publicacaoId);
+        const publicacao = await publicacao.findById(publicacaoId);
         if (!publicacao) {
             return res.status(404).json({ error: 'Publicação não encontrada' });
         }
@@ -230,7 +230,7 @@ router.post('/publicacoes/:id/comentar', async (req, res) => {
     const publicacaoId = req.params.id;
     const { texto, usuario_id, nome_usuario } = req.body;
     try {
-        const publicacao = await Publicacao.findById(publicacaoId);
+        const publicacao = await publicacao.findById(publicacaoId);
         if (!publicacao) {
             return res.status(404).json({ error: 'Publicação não encontrada' });
         }
@@ -249,7 +249,7 @@ router.post('/publicacoes/:id/comentar', async (req, res) => {
 router.post('/publicacoes/:id/dislike', async (req, res) => {
     const publicacaoId = req.params.id;
     try {
-        const publicacao = await Publicacao.findById(publicacaoId);
+        const publicacao = await publicacao.findById(publicacaoId);
         if (!publicacao) {
             return res.status(404).json({ error: 'Publicação não encontrada' });
         }
@@ -269,7 +269,7 @@ router.get('/checkAmigo', async (req, res) => {
     const { userId, friendId } = req.query;
 
     try {
-        const count = await Amigo.countDocuments({ usuario_id: userId, amigo_id: friendId });
+        const count = await amigo.countDocuments({ usuario_id: userId, amigo_id: friendId });
         const isFriend = count > 0;
         res.json({ isFriend });
     } catch (error) {

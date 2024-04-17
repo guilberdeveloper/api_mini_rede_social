@@ -2,9 +2,9 @@ const express = require("express");
 const { createServer } = require("http");
 const { Server } = require("ws");
 const mongoose = require('mongoose');
-const Usuario = require('./models/Usuario');
-const Amigo = require('./models/Amigo');
-const Publicacao = require('./models/Publicacao');
+const usuario = require('./models/usuario');
+const amigo = require('./models/amigo');
+const publicacao = require('./models/publicacao');
 const PORT = process.env.PORT || 3000;
 
 
@@ -26,7 +26,7 @@ const userConnections = {};
 // Função para encontrar amigos de um usuário pelo ID
 async function findUserFriends(userId) {
   try {
-    const friends = await Amigo.find({ usuario_id: userId }).populate('amigo_id', 'name');
+    const friends = await amigo.find({ usuario_id: userId }).populate('amigo_id', 'name');
     return friends.map(friend => ({ id: friend.amigo_id._id, name: friend.amigo_id.name }));
   } catch (error) {
     throw error;
@@ -36,7 +36,7 @@ async function findUserFriends(userId) {
 // Função para buscar o nome do usuário pelo ID
 async function findUserName(userId) {
   try {
-    const user = await Usuario.findById(userId);
+    const user = await usuario.findById(userId);
     if (user) {
       return user.name;
     } else {
