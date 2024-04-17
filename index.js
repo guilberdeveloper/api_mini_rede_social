@@ -1,24 +1,17 @@
 const express = require("express");
-const { createServer } = require("https"); // Modificado para HTTPS
+const { createServer } = require("http");
 const { Server } = require("ws");
 const mongoose = require('mongoose');
 const usuario = require('./models/Usuario');
 const amigo = require('./models/Amigo');
 const publicacao = require('./models/Publicacao');
-const fs = require("fs"); // Módulo File System para ler o certificado
 const PORT = process.env.PORT || 3000;
+
 
 // Configurações do Express
 const app = express();
-
-// Configurações para o servidor HTTPS
-const httpsOptions = {
-  key: fs.readFileSync("caminho_para_seu_certificado_privado.key"),
-  cert: fs.readFileSync("caminho_para_seu_certificado.crt")
-};
-
-const httpsServer = createServer(httpsOptions, app); // Criar servidor HTTPS
-const wss = new Server({ server: httpsServer });
+const httpServer = createServer(app);
+const wss = new Server({ server: httpServer });
 
 // Middleware para habilitar o corpo da solicitação JSON
 app.use(express.json());
@@ -137,6 +130,6 @@ const publicRoutes = require("./routes/publicRoutes");
 app.use("/api", publicRoutes);
 
 
-httpsServer.listen(`${PORT}`, () => { // Modificado para httpsServer
+httpServer.listen(`${PORT}`, () => {
   console.log(`Servidor está rodando na porta ${PORT}`);
 });
