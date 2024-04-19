@@ -15,7 +15,7 @@ const Publicacao = require("../models/Publicacao");
 const tokenSecret = process.env.TOKEN_SECRET;
 
 const usuariosLogados = {};
-
+router.use(bodyParser.json());
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, 'uploads/');
@@ -28,7 +28,38 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 
-router.use(bodyParser.json());
+
+
+router.post("/cadastro", upload.single('fotoUsuario'), async (req, res) => {
+    const { name, email, password, confirmPassword } = req.body;
+
+    if (!name || !email || !password || !confirmPassword) {
+        return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
+    }
+
+    if (password !== confirmPassword) {
+        return res.status(400).json({ error: 'As senhas não coincidem' });
+    }
+
+    let fotoUsuario = '';
+    if (req.file) {
+        fotoUsuario = req.file.path;
+    }
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+        // Utilizando Mongoose para inserir o novo usuário no banco de dados
+        await Usuario.create({ name, email, password: hashedPassword, fotoUsuario });
+
+        res.status(201).json({ message: 'Usuário cadastrado com sucesso' });
+    } catch (error) {
+        console.error('Erro ao gerar hash da senha:', error);
+        return res.status(500).json({ error: 'Erro ao cadastrar usuário' });
+    }
+});
+
+
 
 router.post("/login", async (req, res) => {
     const { email, password } = req.body;
@@ -67,35 +98,6 @@ router.post("/login", async (req, res) => {
 });
 
 
-
-router.post("/cadastro", upload.single('fotoUsuario'), async (req, res) => {
-    const { name, email, password, confirmPassword } = req.body;
-
-    if (!name || !email || !password || !confirmPassword) {
-        return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
-    }
-
-    if (password !== confirmPassword) {
-        return res.status(400).json({ error: 'As senhas não coincidem' });
-    }
-
-    let fotoUsuario = '';
-    if (req.file) {
-        fotoUsuario = req.file.path;
-    }
-
-    try {
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-        // Utilizando Mongoose para inserir o novo usuário no banco de dados
-        await Usuario.create({ name, email, password: hashedPassword, fotoUsuario });
-
-        res.status(201).json({ message: 'Usuário cadastrado com sucesso' });
-    } catch (error) {
-        console.error('Erro ao gerar hash da senha:', error);
-        return res.status(500).json({ error: 'Erro ao cadastrar usuário' });
-    }
-});
 
 
 function buscarPessoasPorNome(name) {
