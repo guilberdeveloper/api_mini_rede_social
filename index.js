@@ -1,10 +1,8 @@
 const express = require("express");
 const { createServer } = require("http");
 const { Server } = require("ws");
-const mongoose = require('mongoose');
-const usuario = require('./models/Usuario');
-const amigo = require('./models/Amigo');
-const publicacao = require('./models/Publicacao');
+const Usuario = require('./models/Usuario');
+const Amigo = require('./models/Amigo');
 const PORT = process.env.PORT || 3000;
 
 
@@ -26,7 +24,7 @@ const userConnections = {};
 // Função para encontrar amigos de um usuário pelo ID
 async function findUserFriends(userId) {
   try {
-    const friends = await amigo.find({ usuario_id: userId }).populate('amigo_id', 'name');
+    const friends = await Amigo.find({ usuario_id: userId }).populate('amigo_id', 'name');
     return friends.map(friend => ({ id: friend.amigo_id._id, name: friend.amigo_id.name }));
   } catch (error) {
     throw error;
@@ -36,7 +34,7 @@ async function findUserFriends(userId) {
 // Função para buscar o nome do usuário pelo ID
 async function findUserName(userId) {
   try {
-    const user = await usuario.findById(userId);
+    const user = await Usuario.findById(userId);
     if (user) {
       return user.name;
     } else {
@@ -117,17 +115,25 @@ app.post("/send-message", async (req, res) => {
   }
 });
 
-// Rota para servir fotos estáticas
-app.use('/user-photos', express.static('./uploads'));
+// Middleware para registrar a rota acessada
+app.use((req, res, next) => {
+  console.log(`Rota acessada: ${req.method} ${req.url}`);
+  next();
+});
 
 app.get("/", (req, res) => {
-  res.send("Hello World!");
+  res.send("API FUNCIONANDO!");
 });
 
 
+// Rota para servir fotos estáticas
+app.use('/user-photos', express.static('./uploads'));
+
 // rotas Publicas
 const publicRoutes = require("./routes/publicRoutes");
+const authRotas = require("./routes/authRotas");
 app.use("/api", publicRoutes);
+app.use("/api/auth", authRotas);
 
 
 httpServer.listen(`${PORT}`, () => {
