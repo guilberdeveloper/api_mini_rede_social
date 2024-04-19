@@ -59,7 +59,7 @@ router.post("/cadastro", upload.single('fotoUsuario'), async (req, res) => {
     }
 });
 
-
+//teste de comentario adicional para push
 
 router.post("/login", async (req, res) => {
     const { email, password } = req.body;
