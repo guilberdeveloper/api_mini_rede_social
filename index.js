@@ -131,9 +131,9 @@ app.use('/user-photos', express.static('./uploads'));
 
 // rotas Publicas
 const publicRoutes = require("./routes/publicRoutes");
-const authRotas = require("./routes/authRotas");
+
 app.use("/api", publicRoutes);
-app.use("/api/auth", authRotas);
+
 
 
 httpServer.listen(`${PORT}`, () => {
