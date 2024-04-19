@@ -131,7 +131,6 @@ app.use('/user-photos', express.static('./uploads'));
 
 // rotas Publicas
 const publicRoutes = require("./routes/publicRoutes");
-
 app.use("/api", publicRoutes);
 
 
